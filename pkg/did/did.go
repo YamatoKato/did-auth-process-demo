@@ -4,6 +4,7 @@ import (
 	"crypto/ed25519"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"strings"
 )
 
@@ -21,4 +22,11 @@ func ExtractPublicKeyFromDID(did string) (ed25519.PublicKey, error) {
 	}
 
 	return ed25519.PublicKey(pubKeyBytes), nil
+}
+
+// 公開鍵からdid:keyを生成
+func GenerateDIDFromPubKey(pubKey []byte) string {
+	// Ref: https://w3c-ccg.github.io/did-method-key/#example-1
+	keyBase64 := base64.URLEncoding.EncodeToString(pubKey)
+	return fmt.Sprintf("did:key:%s", keyBase64)
 }

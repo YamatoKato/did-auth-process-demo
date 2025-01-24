@@ -11,7 +11,7 @@ import (
 	"github.com/YamatoKato/did-auth-process-demo/pkg/hd"
 )
 
-func Handle(w http.ResponseWriter, r *http.Request) {
+func VerifyHandle(w http.ResponseWriter, r *http.Request) {
 	// リクエストボディを読み取る
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -22,10 +22,10 @@ func Handle(w http.ResponseWriter, r *http.Request) {
 
 	// リクエストデータのパース
 	var reqData struct {
-		DIDKey           string   `json:"did_key"` // did:key:base64url(parentPublicKey)
-		EncodedSignature string   `json:"encoded_signature"`
-		ChildNums        []uint32 `json:"childNums"`
+		PublicKey        string   `json:"publicKey"`
 		ChainCode        string   `json:"chainCode"`
+		ChildNums        []uint32 `json:"childNums"`
+		EncodedSignature string   `json:"signature"`
 	}
 	err = json.Unmarshal(body, &reqData)
 	if err != nil {
@@ -34,11 +34,11 @@ func Handle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// DIDから公開鍵の取得
-	pubKey, err := did.ExtractPublicKeyFromDID(reqData.DIDKey)
+	// 保持証明の検証
+	pubKey, err := cryptoPkg.DecodeBase64(reqData.PublicKey)
 	if err != nil {
-		log.Println("DIDから公開鍵の取得に失敗しました")
-		http.Error(w, "DIDから公開鍵の取得に失敗しました", http.StatusBadRequest)
+		log.Println("Base64形式の公開鍵のデコードに失敗しました")
+		http.Error(w, "Base64形式の公開鍵のデコードに失敗しました", http.StatusBadRequest)
 		return
 	}
 
@@ -53,7 +53,7 @@ func Handle(w http.ResponseWriter, r *http.Request) {
 	// 署名の検証
 	isValid := cryptoPkg.VerifySignatureForSecp256k1(
 		pubKey,
-		reqData.DIDKey,
+		reqData.ChainCode,
 		signature,
 	)
 	if !isValid {
@@ -64,6 +64,7 @@ func Handle(w http.ResponseWriter, r *http.Request) {
 
 	// レスポンスデータの構造体
 	type ResponseData struct {
+		DID       string `json:"did"`
 		PublicKey string `json:"publicKey"`
 		ChainCode string `json:"chainCode"`
 		ChildNum  uint32 `json:"childNum"`
@@ -95,11 +96,58 @@ func Handle(w http.ResponseWriter, r *http.Request) {
 
 		// レスポンスデータに追加
 		resData[childNum] = ResponseData{
+			DID:       did.GenerateDIDFromPubKey(exk.PublicKey),
 			PublicKey: cryptoPkg.EncodeBase64(exk.PublicKey),
 			ChainCode: cryptoPkg.EncodeBase64(exk.ChainCode),
 			ChildNum:  exk.ChildNum,
 			Depth:     exk.Depth,
 		}
+	}
+
+	// レスポンスをJSONにエンコード
+	respJSON, err := json.Marshal(resData)
+	if err != nil {
+		log.Printf("レスポンスデータのエンコードに失敗しました: %v", err)
+		http.Error(w, "レスポンスデータのエンコードに失敗しました", http.StatusInternalServerError)
+		return
+	}
+
+	// レスポンスを返す
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(respJSON)
+}
+
+func RequestHandle(w http.ResponseWriter, r *http.Request) {
+	// リクエストボディを読み取る
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.Println("リクエストボディの読み取りに失敗しました")
+		http.Error(w, "リクエストボディの読み取りに失敗しました", http.StatusBadRequest)
+		return
+	}
+
+	// リクエストデータのパース
+	var reqData struct {
+		PublicKey string   `json:"publicKey"`
+		ChainCode string   `json:"chainCode"`
+		ChildNums []uint32 `json:"childNums"`
+	}
+
+	err = json.Unmarshal(body, &reqData)
+	if err != nil {
+		log.Println("リクエストデータのパースに失敗しました")
+		http.Error(w, "リクエストデータのパースに失敗しました", http.StatusBadRequest)
+		return
+	}
+
+	// チャレンジの生成
+	challenge := "challenge"
+
+	resData := struct {
+		Challenge string `json:"challenge"`
+	}{
+		Challenge: challenge + reqData.PublicKey + reqData.ChainCode,
 	}
 
 	// レスポンスをJSONにエンコード

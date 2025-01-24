@@ -10,12 +10,10 @@ import (
 )
 
 type ExtendedKey struct {
-	PrivateKey []byte // 圧縮された秘密鍵
-	PublicKey  []byte // 圧縮された公開鍵
-	ChainCode  []byte
-	Depth      uint8
-	ChildNum   uint32
-	IsHardened bool
+	PublicKey []byte // 圧縮された公開鍵
+	ChainCode []byte
+	Depth     uint8
+	ChildNum  uint32
 }
 
 func NewExtendedKey(
@@ -24,16 +22,14 @@ func NewExtendedKey(
 	childNum uint32,
 ) *ExtendedKey {
 	return &ExtendedKey{
-		PrivateKey: nil,
-		PublicKey:  publicKey,
-		ChainCode:  chainCode,
-		Depth:      0,
-		ChildNum:   childNum,
-		IsHardened: false,
+		PublicKey: publicKey,
+		ChainCode: chainCode,
+		Depth:     0,
+		ChildNum:  childNum,
 	}
 }
 
-// 親公開鍵(M)から子公開鍵(M/0),chaincodeを生成
+// 拡張公開鍵から子公開鍵,chaincodeを生成
 func (pek *ExtendedKey) DeriveChildKey() (*ExtendedKey, error) {
 	// HMAC-SHA512で親の公開鍵とインデックスを使ってハッシュ化（強化されていない）
 	// HMAC-SHA512(Key=chaincode, Data=parentPublicKey || childNum)
@@ -82,14 +78,11 @@ func (pek *ExtendedKey) DeriveChildKey() (*ExtendedKey, error) {
 	childKey := childKeyPub.SerializeCompressed()
 
 	return &ExtendedKey{
-		PrivateKey: nil,
-		PublicKey:  childKey,
-		ChainCode:  childChainCode,
-		Depth:      pek.Depth + 1,
-		ChildNum:   pek.ChildNum,
-		IsHardened: false,
+		PublicKey: childKey,
+		ChainCode: childChainCode,
+		Depth:     pek.Depth + 1,
+		ChildNum:  pek.ChildNum,
 	}, nil
-
 }
 
 // uint32をバイト配列に変換するヘルパー関数

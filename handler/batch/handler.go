@@ -10,7 +10,7 @@ import (
 	"github.com/YamatoKato/did-auth-process-demo/pkg/did"
 )
 
-func Handle(w http.ResponseWriter, r *http.Request) {
+func VerifyHandle(w http.ResponseWriter, r *http.Request) {
 	// リクエストボディを読み取る
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -21,7 +21,7 @@ func Handle(w http.ResponseWriter, r *http.Request) {
 
 	// リクエストデータのパース
 	var reqData []struct {
-		DIDKey           string `json:"did_key"`
+		DID              string `json:"did"`
 		EncodedSignature string `json:"encoded_signature"`
 	}
 	err = json.Unmarshal(body, &reqData)
@@ -33,7 +33,7 @@ func Handle(w http.ResponseWriter, r *http.Request) {
 
 	for _, data := range reqData {
 		// DIDから公開鍵の取得
-		pubKey, err := did.ExtractPublicKeyFromDID(data.DIDKey)
+		pubKey, err := did.ExtractPublicKeyFromDID(data.DID)
 		if err != nil {
 			log.Println("DIDから公開鍵の取得に失敗しました")
 			http.Error(w, "DIDから公開鍵の取得に失敗しました", http.StatusBadRequest)
@@ -51,7 +51,7 @@ func Handle(w http.ResponseWriter, r *http.Request) {
 		// 署名の検証
 		isValid := cryptoPkg.VerifySignature(
 			pubKey,
-			[]byte(data.DIDKey),
+			[]byte(data.DID),
 			signature,
 		)
 		if !isValid {
@@ -64,4 +64,47 @@ func Handle(w http.ResponseWriter, r *http.Request) {
 	// 全ての署名が有効
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("OK"))
+}
+
+func RequestHandle(w http.ResponseWriter, r *http.Request) {
+	challenge := "challenge"
+	// リクエストボディを読み取る
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.Println("リクエストボディの読み取りに失敗しました")
+		http.Error(w, "リクエストボディの読み取りに失敗しました", http.StatusBadRequest)
+		return
+	}
+
+	// リクエストデータのパース
+	var reqData []struct {
+		DID string `json:"did"`
+	}
+	err = json.Unmarshal(body, &reqData)
+	if err != nil {
+		log.Println("リクエストデータのパースに失敗しました")
+		http.Error(w, "リクエストデータのパースに失敗しました", http.StatusBadRequest)
+		return
+	}
+
+	resData := make([]struct {
+		Challenge string `json:"challenge"`
+	}, len(reqData))
+
+	for i, data := range reqData {
+		// チャレンジの生成
+		c := challenge + data.DID
+		resData[i].Challenge = c
+	}
+
+	// レスポンスのエンコード
+	resBody, err := json.Marshal(resData)
+	if err != nil {
+		log.Println("レスポンスデータのエンコードに失敗しました")
+		http.Error(w, "レスポンスデータのエンコードに失敗しました", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write(resBody)
 }

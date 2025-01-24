@@ -10,7 +10,10 @@ import (
 	"github.com/YamatoKato/did-auth-process-demo/pkg/did"
 )
 
-func Handle(w http.ResponseWriter, r *http.Request) {
+func VerifyHandle(w http.ResponseWriter, r *http.Request) {
+	// チャレンジ値
+	challenge := "challenge"
+
 	// リクエストボディを読み取る
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -46,7 +49,7 @@ func Handle(w http.ResponseWriter, r *http.Request) {
 	// 署名の検証
 	isValid := cryptoPkg.VerifySignature(
 		pubKey,
-		[]byte(reqData.DID),
+		[]byte(challenge+reqData.DID),
 		signature,
 	)
 	if !isValid {
@@ -60,4 +63,45 @@ func Handle(w http.ResponseWriter, r *http.Request) {
 	// status code 200
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("OK"))
+}
+
+func RequestHandle(w http.ResponseWriter, r *http.Request) {
+	// DIDの保持証明を要求するためにチャレンジ値を返す
+	// チャレンジ値
+	challenge := "challenge"
+
+	// リクエストボディの読み取り
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.Println("リクエストボディの読み取りに失敗しました")
+		http.Error(w, "リクエストボディの読み取りに失敗しました", http.StatusBadRequest)
+	}
+
+	// リクエストデータのパース
+	var reqData struct {
+		DID string `json:did`
+	}
+	err = json.Unmarshal(body, &reqData)
+	if err != nil {
+		log.Println("リクエストデータのパースに失敗しました")
+		http.Error(w, "リクエストデータのパースに失敗しました", http.StatusBadRequest)
+	}
+
+	// レスポンスデータの構造体
+	resData := struct {
+		Challenge string `json:"challenge"`
+	}{
+		Challenge: challenge + reqData.DID,
+	}
+
+	// レスポンスデータのエンコード
+	resBody, err := json.Marshal(resData)
+	if err != nil {
+		log.Println("レスポンスデータのエンコードに失敗しました")
+		http.Error(w, "レスポンスデータのエンコードに失敗しました", http.StatusInternalServerError)
+	}
+
+	// レスポンス 200 OK
+	w.WriteHeader(http.StatusOK)
+	w.Write(resBody)
 }

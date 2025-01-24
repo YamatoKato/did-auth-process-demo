@@ -11,9 +11,12 @@ import (
 func main() {
 	// エンドポイントの設定
 	mux := http.NewServeMux()
-	mux.HandleFunc("/verify-did-hd", hd.Handle)
-	mux.HandleFunc("/verify-did-repeater", repeater.Handle)
-	mux.HandleFunc("/verify-did-batch", batch.Handle)
+	mux.HandleFunc("/verify-did-hd", hd.RequestHandle)
+	mux.HandleFunc("/request-did-hd", hd.VerifyHandle)
+	mux.HandleFunc("/request-did-repeater", repeater.RequestHandle)
+	mux.HandleFunc("/verify-did-repeater", repeater.VerifyHandle)
+	mux.HandleFunc("/request-did-batch", batch.RequestHandle)
+	mux.HandleFunc("/verify-did-batch", batch.VerifyHandle)
 
 	// サーバーの起動
 	http.ListenAndServe(":8100", mux)
