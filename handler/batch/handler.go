@@ -10,6 +10,9 @@ import (
 	"github.com/YamatoKato/did-auth-process-demo/pkg/did"
 )
 
+// 実測の便宜上、チャレンジ値を永続化しないため固定の文字列を使用
+var challenge = "challenge"
+
 func VerifyHandle(w http.ResponseWriter, r *http.Request) {
 	// リクエストボディを読み取る
 	body, err := io.ReadAll(r.Body)
@@ -20,18 +23,18 @@ func VerifyHandle(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// リクエストデータのパース
-	var reqData []struct {
+	var verifyReqData []struct {
 		DID              string `json:"did"`
 		EncodedSignature string `json:"encoded_signature"`
 	}
-	err = json.Unmarshal(body, &reqData)
+	err = json.Unmarshal(body, &verifyReqData)
 	if err != nil {
 		log.Println("リクエストデータのパースに失敗しました")
 		http.Error(w, "リクエストデータのパースに失敗しました", http.StatusBadRequest)
 		return
 	}
 
-	for _, data := range reqData {
+	for _, data := range verifyReqData {
 		// DIDから公開鍵の取得
 		pubKey, err := did.ExtractPublicKeyFromDID(data.DID)
 		if err != nil {
@@ -51,7 +54,7 @@ func VerifyHandle(w http.ResponseWriter, r *http.Request) {
 		// 署名の検証
 		isValid := cryptoPkg.VerifySignature(
 			pubKey,
-			[]byte(data.DID),
+			[]byte(challenge+data.DID),
 			signature,
 		)
 		if !isValid {

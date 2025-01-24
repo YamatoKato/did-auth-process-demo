@@ -11,6 +11,9 @@ import (
 	"github.com/YamatoKato/did-auth-process-demo/pkg/hd"
 )
 
+// 実測の便宜上、チャレンジ値を永続化しないため固定の文字列を使用
+var challenge = "challenge"
+
 func VerifyHandle(w http.ResponseWriter, r *http.Request) {
 	// リクエストボディを読み取る
 	body, err := io.ReadAll(r.Body)
@@ -21,13 +24,13 @@ func VerifyHandle(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// リクエストデータのパース
-	var reqData struct {
+	var verifyReqData struct {
 		PublicKey        string   `json:"publicKey"`
 		ChainCode        string   `json:"chainCode"`
 		ChildNums        []uint32 `json:"childNums"`
 		EncodedSignature string   `json:"signature"`
 	}
-	err = json.Unmarshal(body, &reqData)
+	err = json.Unmarshal(body, &verifyReqData)
 	if err != nil {
 		log.Println("リクエストデータのパースに失敗しました")
 		http.Error(w, "リクエストデータのパースに失敗しました", http.StatusBadRequest)
@@ -35,7 +38,7 @@ func VerifyHandle(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 保持証明の検証
-	pubKey, err := cryptoPkg.DecodeBase64(reqData.PublicKey)
+	pubKey, err := cryptoPkg.DecodeBase64(verifyReqData.PublicKey)
 	if err != nil {
 		log.Println("Base64形式の公開鍵のデコードに失敗しました")
 		http.Error(w, "Base64形式の公開鍵のデコードに失敗しました", http.StatusBadRequest)
@@ -43,7 +46,7 @@ func VerifyHandle(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Base64形式の署名をデコード
-	signature, err := cryptoPkg.DecodeBase64(reqData.EncodedSignature)
+	signature, err := cryptoPkg.DecodeBase64(verifyReqData.EncodedSignature)
 	if err != nil {
 		log.Println("Base64形式の署名のデコードに失敗しました")
 		http.Error(w, "Base64形式の署名のデコードに失敗しました", http.StatusBadRequest)
@@ -53,7 +56,7 @@ func VerifyHandle(w http.ResponseWriter, r *http.Request) {
 	// 署名の検証
 	isValid := cryptoPkg.VerifySignatureForSecp256k1(
 		pubKey,
-		reqData.ChainCode,
+		challenge+verifyReqData.PublicKey+verifyReqData.ChainCode,
 		signature,
 	)
 	if !isValid {
@@ -71,11 +74,11 @@ func VerifyHandle(w http.ResponseWriter, r *http.Request) {
 		Depth     uint8  `json:"depth"`
 	}
 
-	resData := make([]ResponseData, len(reqData.ChildNums))
+	resData := make([]ResponseData, len(verifyReqData.ChildNums))
 
-	for _, childNum := range reqData.ChildNums {
+	for _, childNum := range verifyReqData.ChildNums {
 		// 子公開鍵の生成
-		chainCode, err := cryptoPkg.DecodeBase64(reqData.ChainCode)
+		chainCode, err := cryptoPkg.DecodeBase64(verifyReqData.ChainCode)
 		if err != nil {
 			log.Printf("chainCodeのデコードに失敗しました: %v", err)
 			http.Error(w, "chainCodeのデコードに失敗しました", http.StatusBadRequest)
@@ -140,9 +143,6 @@ func RequestHandle(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "リクエストデータのパースに失敗しました", http.StatusBadRequest)
 		return
 	}
-
-	// チャレンジの生成
-	challenge := "challenge"
 
 	resData := struct {
 		Challenge string `json:"challenge"`
