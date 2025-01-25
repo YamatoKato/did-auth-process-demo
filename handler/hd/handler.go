@@ -53,6 +53,14 @@ func VerifyHandle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// chainCodeのデコード
+	chainCode, err := cryptoPkg.DecodeBase64(verifyReqData.ChainCode)
+	if err != nil {
+		log.Printf("chainCodeのデコードに失敗しました: %v", err)
+		http.Error(w, "chainCodeのデコードに失敗しました", http.StatusBadRequest)
+		return
+	}
+
 	// 署名の検証
 	isValid := cryptoPkg.VerifySignatureForSecp256k1(
 		pubKey,
@@ -78,12 +86,6 @@ func VerifyHandle(w http.ResponseWriter, r *http.Request) {
 
 	for _, childNum := range verifyReqData.ChildNums {
 		// 子公開鍵の生成
-		chainCode, err := cryptoPkg.DecodeBase64(verifyReqData.ChainCode)
-		if err != nil {
-			log.Printf("chainCodeのデコードに失敗しました: %v", err)
-			http.Error(w, "chainCodeのデコードに失敗しました", http.StatusBadRequest)
-			return
-		}
 		childKey := hd.NewExtendedKey(
 			pubKey,
 			chainCode,

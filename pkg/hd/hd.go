@@ -41,19 +41,19 @@ func (pek *ExtendedKey) DeriveChildKey() (*ExtendedKey, error) {
 	childChainCode := I[32:]
 
 	var ilNum btcec.ModNScalar // これはsecp256k1曲線のNより小さい整数,Nは有限群の位数
-	if overflow := ilNum.SetByteSlice(I[:32]); overflow {
+	if overflow := ilNum.SetByteSlice(il); overflow {
 		return nil, errors.New("invalid child key: hash値Iが有限群の位数を超えています")
 	}
 
 	var (
-		ilScalar btcec.ModNScalar    // il用のスカラー値
-		ilJ      btcec.JacobianPoint // 中間公開鍵（il * G）を表すJacobian座標の点。
+		// ilScalar btcec.ModNScalar    // il用のスカラー値
+		ilJ btcec.JacobianPoint // 中間公開鍵（il * G）を表すJacobian座標の点。
 	)
-	if overflow := ilScalar.SetByteSlice(il); overflow { // ilをスカラー値に変換
-		return nil, errors.New("invalid child key: hash値ilが有限群の位数を超えています")
-	}
+	// if overflow := ilScalar.SetByteSlice(il); overflow { // ilをスカラー値に変換
+	// 	return nil, errors.New("invalid child key: hash値ilが有限群の位数を超えています")
+	// }
 
-	btcec.ScalarBaseMultNonConst(&ilScalar, &ilJ) // 中間公開鍵の計算（il*G）
+	btcec.ScalarBaseMultNonConst(&ilNum, &ilJ) // 中間公開鍵の計算（il*G）
 	if (ilJ.X.IsZero() && ilJ.Y.IsZero()) || ilJ.Z.IsZero() {
 		// x,y,z座標がゼロの場合は無効な公開鍵
 		return nil, errors.New("invalid child key: 中間公開鍵が無効です")
